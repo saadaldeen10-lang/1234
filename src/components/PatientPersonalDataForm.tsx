@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase, Patient } from '../lib/supabase';
 import { User, Loader2, Save } from 'lucide-react';
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 
 interface PatientPersonalDataFormProps {
   patient: Patient;
@@ -64,14 +65,24 @@ export const PatientPersonalDataForm: React.FC<PatientPersonalDataFormProps> = (
     relative_mobile: '',
   });
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [initialData, setInitialData] = useState<FormData | null>(null);
+
+  const hasUnsavedChanges = useMemo(() => {
+    if (!initialData) return false;
+    return JSON.stringify(formData) !== JSON.stringify(initialData);
+  }, [formData, initialData]);
+
+  useUnsavedChanges(hasUnsavedChanges);
 
   useEffect(() => {
     loadFormData();
   }, [patient.id]);
 
   const loadFormData = async () => {
+    setInitialLoading(true);
     try {
       const { data, error } = await supabase
         .from('patient_personal_data')
@@ -82,7 +93,7 @@ export const PatientPersonalDataForm: React.FC<PatientPersonalDataFormProps> = (
       if (error) throw error;
 
       if (data) {
-        setFormData({
+        const loadedData = {
           id: data.id,
           first_name: data.first_name || '',
           middle_name: data.middle_name || '',
@@ -109,10 +120,16 @@ export const PatientPersonalDataForm: React.FC<PatientPersonalDataFormProps> = (
           relative_street: data.relative_street || '',
           relative_home_number: data.relative_home_number || '',
           relative_mobile: data.relative_mobile || '',
-        });
+        };
+        setFormData(loadedData);
+        setInitialData(loadedData);
+      } else {
+        setInitialData(formData);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load form data');
+    } finally {
+      setInitialLoading(false);
     }
   };
 
@@ -162,10 +179,7 @@ export const PatientPersonalDataForm: React.FC<PatientPersonalDataFormProps> = (
           .update(dataToSave)
           .eq('id', formData.id);
 
-        if (updateError) {
-          console.error('Update error:', updateError);
-          throw updateError;
-        }
+        if (updateError) throw updateError;
       } else {
         const { data, error: insertError } = await supabase
           .from('patient_personal_data')
@@ -173,25 +187,32 @@ export const PatientPersonalDataForm: React.FC<PatientPersonalDataFormProps> = (
           .select()
           .single();
 
-        if (insertError) {
-          console.error('Insert error:', insertError);
-          throw insertError;
-        }
+        if (insertError) throw insertError;
         if (data) {
           setFormData(prev => ({ ...prev, id: data.id }));
         }
       }
 
       setSuccess('Personal data saved successfully!');
+      setInitialData(formData);
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      console.error('Save error:', err);
-      const errorMessage = err instanceof Error ? err.message : JSON.stringify(err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
       setError(`Failed to save personal data: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
   };
+
+  if (initialLoading) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
@@ -449,8 +470,8 @@ export const PatientPersonalDataForm: React.FC<PatientPersonalDataFormProps> = (
           </div>
         </div>
 
-        <div className="border-2 border-purple-200 rounded-lg p-6 bg-purple-50">
-          <h3 className="text-xl font-bold text-purple-800 mb-4">
+        <div className="border-2 border-slate-200 rounded-lg p-6 bg-slate-50">
+          <h3 className="text-xl font-bold text-slate-800 mb-4">
             بيانات أقرب شخص Relative Data
           </h3>
 
@@ -464,7 +485,7 @@ export const PatientPersonalDataForm: React.FC<PatientPersonalDataFormProps> = (
                   type="text"
                   value={formData.relative_name}
                   onChange={(e) => handleChange('relative_name', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none transition"
                 />
               </div>
 
@@ -476,7 +497,7 @@ export const PatientPersonalDataForm: React.FC<PatientPersonalDataFormProps> = (
                   type="text"
                   value={formData.relative_relation}
                   onChange={(e) => handleChange('relative_relation', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none transition"
                 />
               </div>
             </div>
@@ -489,7 +510,7 @@ export const PatientPersonalDataForm: React.FC<PatientPersonalDataFormProps> = (
                 type="tel"
                 value={formData.relative_phone}
                 onChange={(e) => handleChange('relative_phone', e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none transition"
               />
             </div>
 
@@ -502,7 +523,7 @@ export const PatientPersonalDataForm: React.FC<PatientPersonalDataFormProps> = (
                   type="text"
                   value={formData.relative_city}
                   onChange={(e) => handleChange('relative_city', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none transition"
                 />
               </div>
 
@@ -514,7 +535,7 @@ export const PatientPersonalDataForm: React.FC<PatientPersonalDataFormProps> = (
                   type="text"
                   value={formData.relative_area}
                   onChange={(e) => handleChange('relative_area', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none transition"
                 />
               </div>
             </div>
@@ -528,7 +549,7 @@ export const PatientPersonalDataForm: React.FC<PatientPersonalDataFormProps> = (
                   type="text"
                   value={formData.relative_street}
                   onChange={(e) => handleChange('relative_street', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none transition"
                 />
               </div>
 
@@ -540,7 +561,7 @@ export const PatientPersonalDataForm: React.FC<PatientPersonalDataFormProps> = (
                   type="text"
                   value={formData.relative_home_number}
                   onChange={(e) => handleChange('relative_home_number', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none transition"
                 />
               </div>
             </div>
@@ -553,7 +574,7 @@ export const PatientPersonalDataForm: React.FC<PatientPersonalDataFormProps> = (
                 type="tel"
                 value={formData.relative_mobile}
                 onChange={(e) => handleChange('relative_mobile', e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none transition"
               />
             </div>
           </div>

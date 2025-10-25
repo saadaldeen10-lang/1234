@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase, Patient } from '../lib/supabase';
 import { ClipboardList, Loader2, Save } from 'lucide-react';
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 
 interface AdmissionsDischargeFormProps {
   patient: Patient;
@@ -62,14 +63,24 @@ export const AdmissionsDischargeForm: React.FC<AdmissionsDischargeFormProps> = (
     discharge_employee_stamp: '',
   });
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [initialData, setInitialData] = useState<FormData | null>(null);
+
+  const hasUnsavedChanges = useMemo(() => {
+    if (!initialData) return false;
+    return JSON.stringify(formData) !== JSON.stringify(initialData);
+  }, [formData, initialData]);
+
+  useUnsavedChanges(hasUnsavedChanges);
 
   useEffect(() => {
     loadFormData();
   }, [patient.id]);
 
   const loadFormData = async () => {
+    setInitialLoading(true);
     try {
       const { data, error } = await supabase
         .from('admissions_discharge')
@@ -80,7 +91,7 @@ export const AdmissionsDischargeForm: React.FC<AdmissionsDischargeFormProps> = (
       if (error) throw error;
 
       if (data) {
-        setFormData({
+        const loadedData = {
           id: data.id,
           admission_date: data.admission_date || '',
           admission_time: data.admission_time || '',
@@ -106,10 +117,16 @@ export const AdmissionsDischargeForm: React.FC<AdmissionsDischargeFormProps> = (
           discharge_employee_date: data.discharge_employee_date || '',
           discharge_employee_signature: data.discharge_employee_signature || '',
           discharge_employee_stamp: data.discharge_employee_stamp || '',
-        });
+        };
+        setFormData(loadedData);
+        setInitialData(loadedData);
+      } else {
+        setInitialData(formData);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load form data');
+    } finally {
+      setInitialLoading(false);
     }
   };
 
@@ -158,10 +175,7 @@ export const AdmissionsDischargeForm: React.FC<AdmissionsDischargeFormProps> = (
           .update(dataToSave)
           .eq('id', formData.id);
 
-        if (updateError) {
-          console.error('Update error:', updateError);
-          throw updateError;
-        }
+        if (updateError) throw updateError;
       } else {
         const { data, error: insertError } = await supabase
           .from('admissions_discharge')
@@ -169,25 +183,32 @@ export const AdmissionsDischargeForm: React.FC<AdmissionsDischargeFormProps> = (
           .select()
           .single();
 
-        if (insertError) {
-          console.error('Insert error:', insertError);
-          throw insertError;
-        }
+        if (insertError) throw insertError;
         if (data) {
           setFormData(prev => ({ ...prev, id: data.id }));
         }
       }
 
       setSuccess('Form saved successfully!');
+      setInitialData(formData);
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      console.error('Save error:', err);
-      const errorMessage = err instanceof Error ? err.message : JSON.stringify(err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
       setError(`Failed to save form: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
   };
+
+  if (initialLoading) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">

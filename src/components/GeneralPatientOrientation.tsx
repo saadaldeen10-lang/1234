@@ -27,6 +27,7 @@ export const GeneralPatientOrientation: React.FC<GeneralPatientOrientationProps>
   const [recordId, setRecordId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<OrientationQuestions>({});
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -35,6 +36,7 @@ export const GeneralPatientOrientation: React.FC<GeneralPatientOrientationProps>
   }, [patient.id]);
 
   const loadOrientation = async () => {
+    setInitialLoading(true);
     try {
       const { data, error } = await supabase
         .from('general_patient_orientation')
@@ -56,6 +58,8 @@ export const GeneralPatientOrientation: React.FC<GeneralPatientOrientationProps>
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load orientation data');
+    } finally {
+      setInitialLoading(false);
     }
   };
 
@@ -101,6 +105,16 @@ export const GeneralPatientOrientation: React.FC<GeneralPatientOrientationProps>
       setLoading(false);
     }
   };
+
+  if (initialLoading) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 text-orange-600 animate-spin" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">

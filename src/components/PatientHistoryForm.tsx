@@ -15,6 +15,7 @@ interface SectionData {
 export const PatientHistoryForm: React.FC<PatientHistoryFormProps> = ({ patient }) => {
   const [sections, setSections] = useState<Record<string, SectionData>>({});
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [uploading, setUploading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -24,6 +25,7 @@ export const PatientHistoryForm: React.FC<PatientHistoryFormProps> = ({ patient 
   }, [patient.id]);
 
   const loadPatientHistory = async () => {
+    setInitialLoading(true);
     try {
       const { data, error } = await supabase
         .from('patient_history')
@@ -45,6 +47,8 @@ export const PatientHistoryForm: React.FC<PatientHistoryFormProps> = ({ patient 
       setSections(sectionsData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load patient history');
+    } finally {
+      setInitialLoading(false);
     }
   };
 
@@ -141,6 +145,16 @@ export const PatientHistoryForm: React.FC<PatientHistoryFormProps> = ({ patient 
       setLoading(false);
     }
   };
+
+  if (initialLoading) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
